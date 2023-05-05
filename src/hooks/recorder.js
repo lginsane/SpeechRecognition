@@ -1,6 +1,6 @@
 import Recorder from "js-audio-recorder";
-import lamejs from "lamejstmp"; // lamejstmp 替代 lamejs 解决引入问题： https://github.com/zhuker/lamejs/issues/91#issuecomment-1146587589
 import Player from "js-audio-recorder/src/player/player";
+import { encodeWAV } from 'js-audio-recorder/src/transform/transform';
 const baiduConfig = {
   client_id: 'IyCRBhk5HHDyiyB4hykIjUSH',
   client_secret: 'WEchmCgbezosAZBiTVjhNaRIHFaE1EER'
@@ -59,11 +59,13 @@ export class RealizeRecorder {
     this.sampleRate = sampleRate;
   }
   // 切换采样位数
-  changeSampleBit() {
+  changeSampleBit(sampleBit) {
     this.sampleBit = sampleBit;
   }
   // 开始录音
   startRecord() {
+    this.clearPlay();
+    const config = this.getOption();
     if (!this.recorder) {
       this.initRecorder();
     } else {
@@ -115,42 +117,42 @@ export class RealizeRecorder {
       console.log("%c回调监听，音频已经完成播放", "color: #2196f3");
     };
 
-    if (this.compiling) {
-      this.playTimer = setInterval(() => {
-        if (!recorder) {
-          return;
-        }
+    // if (this.compiling) {
+    //   this.playTimer = setInterval(() => {
+    //     if (!this.recorder) {
+    //       return;
+    //     }
 
-        let newData = recorder.getNextData();
-        if (!newData.length) {
-          return;
-        }
-        let byteLength = newData[0].byteLength;
-        let buffer = new ArrayBuffer(newData.length * byteLength);
-        let dataView = new DataView(buffer);
+    //     let newData = this.recorder.getNextData();
+    //     if (!newData.length) {
+    //       return;
+    //     }
+    //     let byteLength = newData[0].byteLength;
+    //     let buffer = new ArrayBuffer(newData.length * byteLength);
+    //     let dataView = new DataView(buffer);
 
-        // 数据合并
-        for (let i = 0, iLen = newData.length; i < iLen; ++i) {
-          for (let j = 0, jLen = newData[i].byteLength; j < jLen; ++j) {
-            dataView.setInt8(i * byteLength + j, newData[i].getInt8(j));
-          }
-        }
+    //     // 数据合并
+    //     for (let i = 0, iLen = newData.length; i < iLen; ++i) {
+    //       for (let j = 0, jLen = newData[i].byteLength; j < jLen; ++j) {
+    //         dataView.setInt8(i * byteLength + j, newData[i].getInt8(j));
+    //       }
+    //     }
 
-        // 将录音数据转成WAV格式，并播放
-        let a = encodeWAV(
-          dataView,
-          config.sampleRate,
-          config.sampleRate,
-          config.numChannels,
-          config.sampleBits
-        );
-        let blob = new Blob([a], { type: "audio/wav" });
+    //     // 将录音数据转成WAV格式，并播放
+    //     let a = encodeWAV(
+    //       dataView,
+    //       config.sampleRate,
+    //       config.sampleRate,
+    //       config.numChannels,
+    //       config.sampleBits
+    //     );
+    //     let blob = new Blob([a], { type: "audio/wav" });
 
-        blob.arrayBuffer().then((arraybuffer) => {
-          Player.play(arraybuffer);
-        });
-      }, 3000);
-    }
+    //     blob.arrayBuffer().then((arraybuffer) => {
+    //       Player.play(arraybuffer);
+    //     });
+    //   }, 3000);
+    // }
   }
   // 暂停录音
   pauseRecord() {
@@ -201,72 +203,25 @@ export class RealizeRecorder {
     }
   }
   // 下载PCM
-  downloadPCM() {
+  downloadPCM(name = 'recorder') {
     if (!this.recorder) return;
-    this.recorder.downloadPCM();
+    this.recorder.downloadPCM(name);
   }
   // 下载WAV
-  downloadWAV() {
+  downloadWAV(name = 'recorder') {
     if (!this.recorder) return;
-    console.log(this.recorder.getWAV());
-    this.recorder.downloadWAV();
+    this.recorder.downloadWAV(name);
   }
   // 下载
-  download(name) {
+  download(name = 'recorder') {
     if (!this.recorder) return;
-    const mp3Blob = this.convertToMp3(this.recorder.getWAV());
-    this.recorder.download(mp3Blob, name || "recorder", "mp3");
-  }
-  // TODO: 16位的采样位数支持mp3
-  convertToMp3(wavDataView) {
-    if (!this.recorder) return;
-    // debugger
-    // 获取wav头信息
-    const wav = lamejs.WavHeader.readHeader(wavDataView); // 此处其实可以不用去读wav头信息，毕竟有对应的config配置
-    const { channels, sampleRate } = wav;
-    console.log("wav", wav);
-    const mp3enc = new lamejs.Mp3Encoder(channels, sampleRate, 128);
-
-    // 获取左右通道数据
-    const result = this.recorder.getChannelData();
-    const buffer = [];
-
-    const leftData =
-      result.left &&
-      new Int16Array(result.left.buffer, 0, result.left.byteLength / 2);
-    const rightData =
-      result.right &&
-      new Int16Array(result.right.buffer, 0, result.right.byteLength / 2);
-    const remaining = leftData.length + (rightData ? rightData.length : 0);
-
-    const maxSamples = 1152;
-    for (let i = 0; i < remaining; i += maxSamples) {
-      const left = leftData.subarray(i, i + maxSamples);
-      let right = null;
-      let mp3buf = null;
-
-      if (channels === 2) {
-        right = rightData.subarray(i, i + maxSamples);
-        mp3buf = mp3enc.encodeBuffer(left, right);
-      } else {
-        mp3buf = mp3enc.encodeBuffer(left);
-      }
-
-      if (mp3buf.length > 0) {
-        buffer.push(mp3buf);
-      }
-    }
-
-    const enc = mp3enc.flush();
-
-    if (enc.length > 0) {
-      buffer.push(enc);
-    }
-
-    return new Blob(buffer, { type: "audio/mp3" });
+    const mp3Blob = this.recorder.getWAVBlob();
+    this.recorder.download(mp3Blob, name, "mp3");
   }
   // 语音识别文字-阿里云
-  translateAli() {}
+  translateAli() {
+    
+  }
   // 语音识别文字-百度云
   async translateBaidu() {
     return new Promise((res, rej) => {
@@ -323,6 +278,7 @@ export class RealizeRecorder {
 function blobToBase64(blob, callback) {
   const fileReader = new FileReader();
   fileReader.onload = (e) => {
+    console.log(e, '123')
     callback(e.target.result);
   };
   fileReader.readAsDataURL(blob);

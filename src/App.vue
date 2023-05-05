@@ -42,9 +42,9 @@ async function translateBaidu() {
     </div>
     <br />
     <div>
-      <button @click="recorderInstance.downloadPCM">下载PCM</button>
-      <button @click="recorderInstance.downloadWAV">下载WAV</button>
-      <button @click="recorderInstance.download">下载MP3</button>
+      <button @click="recorderInstance.downloadPCM()">下载PCM</button>
+      <button @click="recorderInstance.downloadWAV()">下载WAV</button>
+      <button @click="recorderInstance.download()">下载MP3</button>
     </div>
     <br />
     <div>

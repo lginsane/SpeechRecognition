@@ -13,8 +13,6 @@
     "axios": "^1.3.6",
     "express": "^4.18.2",
     "js-audio-recorder": "^1.0.7",
-    "lamejs": "^1.2.1",
-    "lamejstmp": "^1.0.1",
     "vue": "^3.2.47"
   },
   "devDependencies": {
